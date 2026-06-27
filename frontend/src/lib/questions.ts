@@ -1,4 +1,4 @@
-// 프로토타입 샘플: 여행 설문 조사 10문항 / 페이지당 2문항 → 총 5페이지 (명세 §6)
+// 프로토타입 샘플: 여행 설문 조사 15문항 / 페이지당 5문항 → 총 3페이지 (명세 §6)
 
 export type QuestionType = "TEXT" | "TEXTAREA" | "SINGLE_CHOICE" | "MULTI_CHOICE";
 
@@ -16,7 +16,7 @@ export interface Question {
   options?: Option[];
 }
 
-export const QUESTIONS_PER_PAGE = 2;
+export const QUESTIONS_PER_PAGE = 5;
 
 export const QUESTIONS: Question[] = [
   // 1페이지
@@ -39,10 +39,9 @@ export const QUESTIONS: Question[] = [
       { value: "food", label: "미식 여행" },
     ],
   },
-  // 2페이지
   {
     id: "q_03",
-    page: 2,
+    page: 1,
     type: "MULTI_CHOICE",
     label: "3. 가보고 싶은 지역을 모두 선택해 주세요.",
     options: [
@@ -55,7 +54,7 @@ export const QUESTIONS: Question[] = [
   },
   {
     id: "q_04",
-    page: 2,
+    page: 1,
     type: "SINGLE_CHOICE",
     label: "4. 주로 누구와 여행하시나요?",
     options: [
@@ -65,10 +64,9 @@ export const QUESTIONS: Question[] = [
       { value: "friends", label: "친구" },
     ],
   },
-  // 3페이지
   {
     id: "q_05",
-    page: 3,
+    page: 1,
     type: "SINGLE_CHOICE",
     label: "5. 1회 여행 예산은 어느 정도인가요?",
     options: [
@@ -78,9 +76,10 @@ export const QUESTIONS: Question[] = [
       { value: "o200", label: "200만원 이상" },
     ],
   },
+  // 2페이지
   {
     id: "q_06",
-    page: 3,
+    page: 2,
     type: "MULTI_CHOICE",
     label: "6. 여행지에서 즐기고 싶은 활동을 선택해 주세요.",
     options: [
@@ -91,10 +90,9 @@ export const QUESTIONS: Question[] = [
       { value: "wellness", label: "웰니스/스파" },
     ],
   },
-  // 4페이지
   {
     id: "q_07",
-    page: 4,
+    page: 2,
     type: "SINGLE_CHOICE",
     label: "7. 선호하는 숙박 형태는 무엇인가요?",
     options: [
@@ -106,17 +104,53 @@ export const QUESTIONS: Question[] = [
   },
   {
     id: "q_08",
-    page: 4,
-    type: "TEXTAREA",
-    label: "8. 가장 기억에 남는 여행 경험을 적어 주세요.",
-    placeholder: "자유롭게 작성해 주세요.",
+    page: 2,
+    type: "SINGLE_CHOICE",
+    label: "8. 주로 어떤 교통수단으로 이동하시나요?",
+    options: [
+      { value: "flight", label: "항공" },
+      { value: "train", label: "기차/고속철도" },
+      { value: "car", label: "자동차/렌터카" },
+      { value: "cruise", label: "크루즈/선박" },
+    ],
   },
-  // 5페이지
   {
     id: "q_09",
-    page: 5,
+    page: 2,
     type: "SINGLE_CHOICE",
-    label: "9. 연간 여행 횟수는 어느 정도인가요?",
+    label: "9. 선호하는 여행 기간은 어느 정도인가요?",
+    options: [
+      { value: "day", label: "당일치기" },
+      { value: "1_2", label: "1박 2일" },
+      { value: "3_4", label: "3박 4일" },
+      { value: "5+", label: "5박 이상" },
+    ],
+  },
+  {
+    id: "q_10",
+    page: 2,
+    type: "SINGLE_CHOICE",
+    label: "10. 선호하는 여행 시기는 언제인가요?",
+    options: [
+      { value: "spring", label: "봄" },
+      { value: "summer", label: "여름" },
+      { value: "autumn", label: "가을" },
+      { value: "winter", label: "겨울" },
+    ],
+  },
+  // 3페이지
+  {
+    id: "q_11",
+    page: 3,
+    type: "TEXTAREA",
+    label: "11. 가장 기억에 남는 여행 경험을 적어 주세요.",
+    placeholder: "자유롭게 작성해 주세요.",
+  },
+  {
+    id: "q_12",
+    page: 3,
+    type: "SINGLE_CHOICE",
+    label: "12. 연간 여행 횟수는 어느 정도인가요?",
     options: [
       { value: "1", label: "연 1회" },
       { value: "2_3", label: "연 2~3회" },
@@ -125,13 +159,41 @@ export const QUESTIONS: Question[] = [
     ],
   },
   {
-    id: "q_10",
-    page: 5,
+    id: "q_13",
+    page: 3,
+    type: "SINGLE_CHOICE",
+    label: "13. 여행 정보를 주로 어디서 얻으시나요?",
+    options: [
+      { value: "sns", label: "SNS/유튜브" },
+      { value: "blog", label: "블로그/카페" },
+      { value: "agency", label: "여행사" },
+      { value: "acquaintance", label: "지인 추천" },
+    ],
+  },
+  {
+    id: "q_14",
+    page: 3,
+    type: "MULTI_CHOICE",
+    label: "14. 여행 시 가장 중요하게 생각하는 요소를 모두 선택해 주세요.",
+    options: [
+      { value: "price", label: "가격" },
+      { value: "safety", label: "안전" },
+      { value: "convenience", label: "편의성" },
+      { value: "experience", label: "특별한 경험" },
+      { value: "rest", label: "휴식" },
+    ],
+  },
+  {
+    id: "q_15",
+    page: 3,
     type: "TEXTAREA",
-    label: "10. 여행 서비스에 바라는 점이나 자유 의견을 남겨 주세요.",
+    label: "15. 여행 서비스에 바라는 점이나 자유 의견을 남겨 주세요.",
     placeholder: "자유롭게 작성해 주세요.",
   },
 ];
+
+// 각 페이지(1-based)의 단계 라벨 — Stepper UI에서 현재 단계 인지용
+export const PAGE_TITLES: string[] = ["여행 성향", "여행 선호", "경험 · 의견"];
 
 export const TOTAL_PAGES = Math.max(...QUESTIONS.map((q) => q.page));
 

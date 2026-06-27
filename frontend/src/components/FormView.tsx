@@ -7,7 +7,7 @@ import type { FieldValue, Role } from "@/lib/types";
 import { roleLabel } from "@/lib/types";
 import {
   QUESTIONS,
-  TOTAL_PAGES,
+  PAGE_TITLES,
   questionsOnPage,
 } from "@/lib/questions";
 import { useFormSync } from "@/hooks/useFormSync";
@@ -15,14 +15,7 @@ import { QuestionField } from "@/components/QuestionField";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
+import { Stepper } from "@/components/ui/stepper";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -105,7 +98,7 @@ export default function FormView({ formId, role }: { formId: string; role: Role 
   }
 
   return (
-    <main className="mx-auto max-w-2xl p-4 pb-28 sm:p-6">
+    <main className="mx-auto max-w-2xl p-4 pb-28 sm:p-6 sm:pb-28">
       {/* 헤더: 폼 정보 + presence */}
       <header className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b pb-4">
         <div>
@@ -132,6 +125,14 @@ export default function FormView({ formId, role }: { formId: string; role: Role 
         </div>
       </header>
 
+      {/* 단계 표시 (Stepper) — 클릭 시 양방향 동기화 이동 */}
+      <Stepper
+        className="mb-6"
+        current={sync.currentPage}
+        steps={PAGE_TITLES.map((label, i) => ({ value: i + 1, label }))}
+        onStepClick={(page) => sync.goToPage(page)}
+      />
+
       {/* 현재 페이지 문항 */}
       <div className="space-y-4">
         {pageQuestions.map((q) => (
@@ -146,58 +147,9 @@ export default function FormView({ formId, role }: { formId: string; role: Role 
         ))}
       </div>
 
-      {/* 페이지네이션 (양방향 동기화) */}
-      <div className="mt-6">
-        <Pagination>
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious
-                href="#"
-                aria-disabled={sync.currentPage === 1}
-                className={sync.currentPage === 1 ? "pointer-events-none opacity-50" : ""}
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (sync.currentPage > 1) sync.goToPage(sync.currentPage - 1);
-                }}
-              />
-            </PaginationItem>
-            {Array.from({ length: TOTAL_PAGES }, (_, i) => i + 1).map((page) => (
-              <PaginationItem key={page}>
-                <PaginationLink
-                  href="#"
-                  isActive={page === sync.currentPage}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    sync.goToPage(page);
-                  }}
-                >
-                  {page}
-                </PaginationLink>
-              </PaginationItem>
-            ))}
-            <PaginationItem>
-              <PaginationNext
-                href="#"
-                aria-disabled={sync.currentPage === TOTAL_PAGES}
-                className={
-                  sync.currentPage === TOTAL_PAGES ? "pointer-events-none opacity-50" : ""
-                }
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (sync.currentPage < TOTAL_PAGES) sync.goToPage(sync.currentPage + 1);
-                }}
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
-      </div>
-
-      {/* 제출 바 */}
+      {/* 하단 고정 바: 제출 (단계 이동은 상단 Stepper에서 처리) */}
       <div className="fixed inset-x-0 bottom-0 border-t bg-background/95 p-4 backdrop-blur">
-        <div className="mx-auto flex max-w-2xl items-center justify-between">
-          <span className="text-sm text-muted-foreground">
-            {sync.currentPage} / {TOTAL_PAGES} 페이지
-          </span>
+        <div className="mx-auto flex max-w-2xl items-center justify-end">
           <Button onClick={handleSubmitClick} disabled={!sync.connected}>
             {role === "A" ? "제출하기" : "작성자에게 제출 요청"}
           </Button>
