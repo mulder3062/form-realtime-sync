@@ -3,8 +3,9 @@
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import type { FieldValue, Role } from "@/lib/types";
+import type { FieldValue, Participant, Role } from "@/lib/types";
 import { roleLabel } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import {
   QUESTIONS,
   PAGE_TITLES,
@@ -14,7 +15,6 @@ import { useFormSync } from "@/hooks/useFormSync";
 import { QuestionField } from "@/components/QuestionField";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Stepper } from "@/components/ui/stepper";
 import {
   AlertDialog,
@@ -27,23 +27,63 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-function PresenceBadge({ role, online }: { role: Role; online: boolean }) {
+/** 한 역할(작성자/상담사)의 접속자들을 칩으로 나열. 같은 역할 N명을 모두 표시한다. */
+function PresenceGroup({
+  role,
+  list,
+  myClientId,
+}: {
+  role: Role;
+  list: Participant[];
+  myClientId: string;
+}) {
   return (
     <div className="flex items-center gap-2">
-      <Avatar className="size-8">
-        <AvatarFallback className={online ? "bg-green-100 text-green-700" : "bg-muted"}>
-          {role}
-        </AvatarFallback>
-      </Avatar>
-      <div className="flex flex-col leading-tight">
-        <span className="text-sm font-medium">{roleLabel(role)}</span>
-        <Badge
-          variant="outline"
-          className={online ? "border-green-500 text-green-600" : "text-muted-foreground"}
-        >
-          {online ? "접속 중" : "오프라인"}
-        </Badge>
+      <span className="text-sm font-medium">{roleLabel(role)}</span>
+      <Badge
+        variant="outline"
+        className={list.length ? "border-green-500 text-green-600" : "text-muted-foreground"}
+      >
+        {list.length}명
+      </Badge>
+      <div className="flex flex-wrap items-center gap-1">
+        {list.map((p) => {
+          const isMe = p.clientId === myClientId;
+          return (
+            <span
+              key={p.clientId}
+              title={p.clientId} // 디버깅용: 전체 clientId
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs",
+                isMe
+                  ? "border-primary bg-primary/5 font-medium"
+                  : "border-muted-foreground/30 text-muted-foreground",
+              )}
+            >
+              <span className="size-1.5 rounded-full bg-green-500" />
+              {roleLabel(role)}
+              {isMe && " (나)"}
+            </span>
+          );
+        })}
       </div>
+    </div>
+  );
+}
+
+function PresenceBar({
+  participants,
+  myClientId,
+}: {
+  participants: Participant[];
+  myClientId: string;
+}) {
+  const authors = participants.filter((p) => p.role === "AUTHOR");
+  const counselors = participants.filter((p) => p.role === "COUNSELOR");
+  return (
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+      <PresenceGroup role="AUTHOR" list={authors} myClientId={myClientId} />
+      <PresenceGroup role="COUNSELOR" list={counselors} myClientId={myClientId} />
     </div>
   );
 }
@@ -72,17 +112,17 @@ export default function FormView({ formId, role }: { formId: string; role: Role 
   const pageQuestions = questionsOnPage(sync.currentPage);
 
   const handleSubmitClick = () => {
-    if (role === "A") {
-      sync.confirmSubmit(); // A 직접 제출은 모달 없이 바로 (명세 §5.1)
+    if (role === "AUTHOR") {
+      sync.confirmSubmit(); // 작성자 직접 제출은 모달 없이 바로 (명세 §5.1)
     } else {
       sync.requestSubmit();
-      toast.info("작성자 A에게 제출 요청을 보냈습니다");
+      toast.info("작성자에게 제출 요청을 보냈습니다");
     }
   };
 
   if (sync.submitted) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center gap-4 p-6 text-center">
+      <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center gap-4 px-4 text-center">
         <div className="text-5xl">✅</div>
         <h1 className="text-2xl font-bold">제출이 완료되었습니다</h1>
         <p className="text-muted-foreground">
@@ -98,9 +138,9 @@ export default function FormView({ formId, role }: { formId: string; role: Role 
   }
 
   return (
-    <main className="mx-auto max-w-2xl p-4 pb-28 sm:p-6 sm:pb-28">
+    <main className="mx-auto w-full max-w-4xl px-4 pb-28 pt-4 sm:px-6 sm:pt-6 lg:px-8">
       {/* 헤더: 폼 정보 + presence */}
-      <header className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b pb-4">
+      <header className="mb-6 flex flex-col gap-4 border-b pb-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-xl font-bold">여행 설문 조사</h1>
           <p className="text-sm text-muted-foreground">
@@ -119,10 +159,7 @@ export default function FormView({ formId, role }: { formId: string; role: Role 
             </span>
           </p>
         </div>
-        <div className="flex gap-4">
-          <PresenceBadge role="A" online={sync.presence.A} />
-          <PresenceBadge role="B" online={sync.presence.B} />
-        </div>
+        <PresenceBar participants={sync.participants} myClientId={sync.myClientId} />
       </header>
 
       {/* 단계 표시 (Stepper) — 클릭 시 양방향 동기화 이동 */}
@@ -141,7 +178,6 @@ export default function FormView({ formId, role }: { formId: string; role: Role 
             question={q}
             form={form}
             sync={sync}
-            role={role}
             readOnly={sync.submitted}
           />
         ))}
@@ -149,9 +185,9 @@ export default function FormView({ formId, role }: { formId: string; role: Role 
 
       {/* 하단 고정 바: 제출 (단계 이동은 상단 Stepper에서 처리) */}
       <div className="fixed inset-x-0 bottom-0 border-t bg-background/95 p-4 backdrop-blur">
-        <div className="mx-auto flex max-w-2xl items-center justify-end">
+        <div className="mx-auto flex w-full max-w-4xl items-center justify-end px-0 sm:px-2 lg:px-4">
           <Button onClick={handleSubmitClick} disabled={!sync.connected}>
-            {role === "A" ? "제출하기" : "작성자에게 제출 요청"}
+            {role === "AUTHOR" ? "제출하기" : "작성자에게 제출 요청"}
           </Button>
         </div>
       </div>

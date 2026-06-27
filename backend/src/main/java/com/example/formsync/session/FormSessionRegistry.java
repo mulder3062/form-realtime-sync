@@ -1,8 +1,10 @@
 package com.example.formsync.session;
 
+import com.example.formsync.model.Participant;
 import com.example.formsync.model.SessionInfo;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -24,6 +26,20 @@ public class FormSessionRegistry {
         if (sessionId == null || formId == null) return;
         sessionIndex.put(sessionId, new SessionInfo(formId, clientId, role));
         formSessions.computeIfAbsent(formId, k -> ConcurrentHashMap.newKeySet()).add(sessionId);
+    }
+
+    /**
+     * 해당 폼에 현재 접속 중인 참가자 목록(clientId 단위).
+     * 신규 접속자에게 스냅샷과 함께 내려줘 "이미 들어와 있는 사람"을 인지시킨다.
+     */
+    public List<Participant> participants(String formId) {
+        Set<String> sessions = formSessions.get(formId);
+        if (sessions == null) return List.of();
+        return sessions.stream()
+                .map(sessionIndex::get)
+                .filter(info -> info != null)
+                .map(info -> new Participant(info.clientId(), info.role()))
+                .toList();
     }
 
     /** 세션 제거 후 해당 세션의 정보를 반환(없으면 null) */

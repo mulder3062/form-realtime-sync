@@ -19,11 +19,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 타입 체크: `npx tsc --noEmit` / 빌드: `npm run build` / 린트: `npm run lint`
 - 백엔드 주소는 `NEXT_PUBLIC_WS_URL`(기본 `http://localhost:8080/ws`)로 주입. 백엔드 포트를 바꿨다면 `frontend/.env.local`에 이 값을 지정한다.
 
-**E2E 동작 확인**: 브라우저 탭 둘에서 같은 폼 ID로 각각 `?role=A`, `?role=B` 입장(랜딩 페이지에서 선택). STOMP 레벨 통합 검증은 `@stomp/stompjs` + `sockjs-client`로 두 클라이언트를 띄워 스냅샷·브로드캐스트·락 자동해제를 assert하는 방식으로 한다(`frontend/node_modules`에서 ESM 실행).
+**E2E 동작 확인**: 브라우저 탭 둘 이상에서 같은 폼 ID로 각각 `?role=author`, `?role=counselor` 입장(랜딩 페이지에서 선택). 같은 역할로 여러 명 입장해도 된다. STOMP 레벨 통합 검증은 `@stomp/stompjs` + `sockjs-client`로 두 클라이언트를 띄워 스냅샷·브로드캐스트·락 자동해제를 assert하는 방식으로 한다(`frontend/node_modules`에서 ESM 실행).
 
 ## 프로젝트 개요
 
-Google Forms 형태의 폼 서비스에 **작성자(A)와 상담사(B) 간 실시간 화면 미러링/양방향 동기화**를 더한 프로토타입. A가 폼 작성 중 도움을 요청하면 B가 폼 ID로 접속해 A의 현재 상태(값 + 현재 페이지 + 포커스)를 그대로 공유하고, 페이지 이동·문항 포커스·필드 편집을 양방향으로 동기화한다. **DB 없이 서버 인메모리만 사용하는 프로토타입**이다.
+Google Forms 형태의 폼 서비스에 **작성자와 상담사 간 실시간 화면 미러링/양방향 동기화**를 더한 프로토타입. 작성자가 폼 작성 중 도움을 요청하면 상담사가 폼 ID로 접속해 작성자의 현재 상태(값 + 현재 페이지 + 포커스)를 그대로 공유하고, 페이지 이동·문항 포커스·필드 편집을 양방향으로 동기화한다. 접속 구분은 작성자(`AUTHOR`)/상담사(`COUNSELOR`) 두 역할뿐이며, **같은 역할이 N명 동시 접속 가능**하다(개별 식별은 역할이 아니라 `clientId`). **DB 없이 서버 인메모리만 사용하는 프로토타입**이다.
 
 ## 기술 스택 & 모노레포 구조
 
@@ -40,15 +40,15 @@ git mono repo. 경로는 `frontend/`(Next.js + Shadcn/ui)와 `backend/`(Spring B
 
 이 시스템의 정합성은 아래 규칙들의 **상호 의존**에 달려 있다. 하나라도 어기면 재연결·신규 접속 시 화면이 영구히 어긋난다.
 
-1. **서버 인메모리가 Source of Truth.** 폼 상태는 백엔드 `Map<formId, FormState>`(`FormStore`)에 보관한다. `FormState`는 단순 답변값뿐 아니라 `currentPage`, `focusedQuestionId`, `submitted`, `locks`(questionId → clientId)를 포함해야 "A가 보던 화면 그대로"가 성립한다.
+1. **서버 인메모리가 Source of Truth.** 폼 상태는 백엔드 `Map<formId, FormState>`(`FormStore`)에 보관한다. `FormState`는 단순 답변값뿐 아니라 `currentPage`, `focusedQuestionId`, `submitted`, `locks`(questionId → clientId)를 포함해야 "작성자가 보던 화면 그대로"가 성립한다.
 
 2. **모든 데이터/네비게이션 이벤트는 브로드캐스트 시 반드시 `FormState`를 갱신한다.** 이벤트 컨트롤러(`@MessageMapping`)에서 PAGE_CHANGE / FOCUS_QUESTION / FIELD_UPDATE / FIELD_LOCK / FIELD_UNLOCK / FORM_SUBMITTED는 상태를 갱신하고, SUBMIT_REQUEST / USER_* 는 갱신 없이 릴레이만 한다. 갱신을 빠뜨리면 스냅샷이 옛 값을 내려보낸다.
 
-3. **접속 시 스냅샷 핸드셰이크 — 구독을 먼저, 스냅샷 요청을 나중에.** 클라이언트는 `onConnect`에서 `(1) /topic/form/{formId} 구독 → (2) 스냅샷 요청` 순서를 지킨다. 구독이 늦으면 스냅샷 수신 중 흐른 델타가 유실되어 해당 필드가 영구히 어긋난다. 백엔드는 `@SubscribeMapping`으로 `FormStore.getOrCreate(formId)`의 현재 전체 상태를 1회 내려준다.
+3. **접속 시 스냅샷 핸드셰이크 — 구독을 먼저, 스냅샷 요청을 나중에.** 클라이언트는 `onConnect`에서 `(1) /topic/form/{formId} 구독 → (2) 스냅샷 요청` 순서를 지킨다. 구독이 늦으면 스냅샷 수신 중 흐른 델타가 유실되어 해당 필드가 영구히 어긋난다. 백엔드는 `@SubscribeMapping`으로 `FormSnapshot`(현재 전체 상태 `state` + 접속자 목록 `participants`)을 1회 내려준다. 이 시점엔 신규 접속자의 `USER_JOIN` 등록 전이라 `participants`엔 기존 접속자만 담기고, 신규 접속자는 로컬에서 자기 자신을 합친다.
 
 4. **재연결 = 신규 접속.** STOMP에는 재전송 메커니즘이 없으므로, `@stomp/stompjs`의 `onConnect`(최초 + 모든 재연결마다 호출됨)에서 항상 "구독 → 스냅샷 재요청 → 전체 상태 덮어쓰기"를 수행한다. 첫 접속과 재접속을 같은 코드로 처리하는 것이 핵심. heartbeat 10초 + `reconnectDelay`로 조용한 단절을 감지·복구한다.
 
-5. **무한 루프 가드는 역할이 아니라 `clientId`(UUID)로 한다.** 접속 시 `crypto.randomUUID()`로 생성한 `clientId`를 모든 메시지 payload에 싣고, 수신 시 `event.clientId === myClientId`면 무시한다. 역할("A"/"B")이 아니라 clientId를 쓰는 이유: 익명 STOMP 연결에서 `Principal`이 null이라 Principal 핸드셰이크를 통째로 생략할 수 있기 때문(NPE 회피).
+5. **무한 루프 가드와 presence는 역할이 아니라 `clientId`(UUID)로 한다.** 접속 시 `crypto.randomUUID()`로 생성한 `clientId`를 모든 메시지 payload에 싣고, 수신 시 `event.clientId === myClientId`면 무시한다. 역할(`AUTHOR`/`COUNSELOR`)이 아니라 clientId를 쓰는 이유: 익명 STOMP 연결에서 `Principal`이 null이라 Principal 핸드셰이크를 통째로 생략할 수 있고(NPE 회피), **같은 역할이 N명 접속해도 각각을 구분**할 수 있기 때문이다. presence도 `clientId` 단위 참가자 목록으로 관리해 한 명이 끊겨도(`USER_LEAVE`는 해당 `clientId`만 제거) 같은 역할의 나머지는 유지된다.
 
 ## 충돌 정책
 
@@ -58,11 +58,11 @@ git mono repo. 경로는 `frontend/`(Next.js + Shadcn/ui)와 `backend/`(Spring B
 
 ## 제출 흐름 (2단계, 권한 분리)
 
-제출 확정 권한은 **작성자 A만** 보유한다. B는 `SUBMIT_REQUEST`만 보낼 수 있고, A 화면에 `AlertDialog` 확인 모달이 떠 A가 직접 확정하면 `FORM_SUBMITTED`를 브로드캐스트한다. A가 직접 제출할 땐 모달 없이 바로 `FORM_SUBMITTED`. "동기화는 양방향, 제출 확정은 A 단방향"이라는 핵심 제약이다.
+제출 확정 권한은 **작성자만** 보유한다. 상담사는 `SUBMIT_REQUEST`만 보낼 수 있고, 작성자 화면에 `AlertDialog` 확인 모달이 떠 작성자가 직접 확정하면 `FORM_SUBMITTED`를 브로드캐스트한다. 작성자가 직접 제출할 땐 모달 없이 바로 `FORM_SUBMITTED`. "동기화는 양방향, 제출 확정은 작성자 단방향"이라는 핵심 제약이다.
 
 ## 동기화 이벤트 & 메시지 포맷
 
-Topic: `/topic/form/{formId}`. 모든 메시지는 공통으로 `type`, `clientId`(발신자 UUID), `role`('A'|'B'), `payload`를 포함한다. 전체 이벤트 타입과 payload 예시는 명세서 §5에 있다: `PAGE_CHANGE`, `FOCUS_QUESTION`, `FIELD_UPDATE`, `FIELD_LOCK`/`FIELD_UNLOCK`, `SUBMIT_REQUEST`/`FORM_SUBMITTED`, `USER_JOIN`/`USER_LEAVE`.
+Topic: `/topic/form/{formId}`. 모든 메시지는 공통으로 `type`, `clientId`(발신자 UUID), `role`(`AUTHOR`|`COUNSELOR`), `payload`를 포함한다. 전체 이벤트 타입과 payload 예시는 명세서 §5에 있다: `PAGE_CHANGE`, `FOCUS_QUESTION`, `FIELD_UPDATE`, `FIELD_LOCK`/`FIELD_UNLOCK`, `SUBMIT_REQUEST`/`FORM_SUBMITTED`, `USER_JOIN`/`USER_LEAVE`. 스냅샷 응답은 `FormSnapshot { state, participants }` 형태다(참가자 = `{ clientId, role }`).
 
 ## 흔히 놓치는 함정 (시연 성패 직결)
 
@@ -70,7 +70,7 @@ Topic: `/topic/form/{formId}`. 모든 메시지는 공통으로 `type`, `clientI
 - **페이지 점프 후 스크롤 타이밍.** 다른 페이지로 이동 후 `scrollIntoView` 하려면, 페이지 상태(`currentPage`)를 의존성으로 하는 `useEffect`에서 스크롤한다. `requestAnimationFrame` 한 번으로는 새 페이지 DOM이 그려지기 전이라 `getElementById`가 null을 반환할 수 있다. 패턴: 목표 questionId를 `pendingFocus` 상태로 예약 → 페이지 이동 → `useEffect([currentPage, pendingFocus])`에서 실제 스크롤.
 - **텍스트 입력은 300ms 디바운스 후 전송**(객관식은 클릭 즉시). 단, **제출 확정 직전에 보류 중인 디바운스 입력을 flush**해야 마지막 타이핑이 유실되지 않는다.
 - **react-hook-form 외부 값 주입은 `setValue(qId, value, { shouldValidate: false, shouldDirty: false })`** 로 한다. clientId 가드(규칙 5)와 함께 쓰지 않으면 무한 루프가 생긴다.
-- `ConcurrentHashMap`은 맵 구조만 보호한다. 같은 `FormState` 내부 필드 동시 변경은 보호하지 않으므로 불변 객체 통째 교체 또는 formId 단위 동기화를 고려한다(2명 시나리오라 실제 충돌 확률은 낮음).
+- `ConcurrentHashMap`은 맵 구조만 보호한다. 같은 `FormState` 내부 필드 동시 변경은 보호하지 않으므로 불변 객체 통째 교체 또는 formId 단위 동기화를 고려한다(소수 인원 시나리오라 실제 충돌 확률은 낮음).
 
 ## 실서비스 전환 대비 추상화
 

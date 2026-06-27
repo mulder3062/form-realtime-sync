@@ -1,6 +1,7 @@
 package com.example.formsync.controller;
 
 import com.example.formsync.model.FormEvent;
+import com.example.formsync.model.FormSnapshot;
 import com.example.formsync.model.FormState;
 import com.example.formsync.session.FormSessionRegistry;
 import com.example.formsync.store.FormStore;
@@ -29,12 +30,13 @@ public class FormSyncController {
     }
 
     /**
-     * 구독 시 현재 전체 상태(값+페이지+포커스+락+제출)를 1회 직접 응답한다(명세 §4.2).
+     * 구독 시 현재 전체 상태(값+페이지+포커스+락+제출)와 현재 접속자 목록을 1회 직접 응답한다(명세 §4.2).
      * 클라이언트는 /topic 구독을 먼저 건 뒤 이 목적지를 구독해 스냅샷을 받는다(레이스 컨디션 방지).
+     * 이 시점엔 신규 접속자의 USER_JOIN 등록 전이라 participants에는 "기존 접속자"만 담긴다.
      */
     @SubscribeMapping("/form/{formId}/snapshot")
-    public FormState onSubscribe(@DestinationVariable String formId) {
-        return formStore.getOrCreate(formId);
+    public FormSnapshot onSubscribe(@DestinationVariable String formId) {
+        return new FormSnapshot(formStore.getOrCreate(formId), sessionRegistry.participants(formId));
     }
 
     /**

@@ -11,7 +11,7 @@ export default async function FormPage({
 }) {
   const { formId } = await params;
   const { role: roleParam } = await searchParams;
-  const role: Role = roleParam === "B" ? "B" : "A";
+  const role: Role = roleParam === "counselor" ? "COUNSELOR" : "AUTHOR";
 
   return <FormView formId={formId} role={role} />;
 }

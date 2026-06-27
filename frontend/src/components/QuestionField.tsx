@@ -2,7 +2,7 @@
 
 import { Controller, type UseFormReturn } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
-import type { FieldValue, Role } from "@/lib/types";
+import type { FieldValue } from "@/lib/types";
 import { roleLabel } from "@/lib/types";
 import type { Question } from "@/lib/questions";
 import type { FormSyncApi } from "@/hooks/useFormSync";
@@ -18,13 +18,12 @@ interface Props {
   question: Question;
   form: UseFormReturn<Record<string, FieldValue>>;
   sync: FormSyncApi;
-  role: Role;
   readOnly: boolean;
 }
 
-export function QuestionField({ question, form, sync, role, readOnly }: Props) {
+export function QuestionField({ question, form, sync, readOnly }: Props) {
   const lockedByOther = sync.isLockedByOther(question.id);
-  const otherRole: Role = role === "A" ? "B" : "A";
+  const lockOwnerRole = sync.lockOwnerRole(question.id);
   const disabled = readOnly || lockedByOther;
   const isText = question.type === "TEXT" || question.type === "TEXTAREA";
 
@@ -52,7 +51,7 @@ export function QuestionField({ question, form, sync, role, readOnly }: Props) {
           <Label className="text-base font-medium leading-relaxed">{question.label}</Label>
           {lockedByOther && (
             <Badge variant="secondary" className="shrink-0 animate-pulse">
-              {roleLabel(otherRole)} 입력 중
+              {lockOwnerRole ? roleLabel(lockOwnerRole) : "상대방"} 입력 중
             </Badge>
           )}
         </div>
