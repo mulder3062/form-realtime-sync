@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import type { FieldValue, Participant, Role } from "@/lib/types";
 import { roleLabel } from "@/lib/types";
@@ -110,6 +111,7 @@ export default function FormView({ formId, role }: { formId: string; role: Role 
   }, [sync.currentPage, sync.pendingFocus, sync]);
 
   const pageQuestions = questionsOnPage(sync.currentPage);
+  const totalPages = PAGE_TITLES.length;
 
   const handleSubmitClick = () => {
     if (role === "AUTHOR") {
@@ -140,35 +142,32 @@ export default function FormView({ formId, role }: { formId: string; role: Role 
   return (
     <main className="mx-auto w-full max-w-4xl px-4 pb-28 pt-4 sm:px-6 sm:pt-6 lg:px-8">
       {/* 헤더: 폼 정보 + presence */}
-      <header className="mb-6 flex flex-col gap-4 border-b pb-4 lg:flex-row lg:items-start lg:justify-between">
+      <header className="mb-4 flex flex-col gap-3 border-b pb-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-xl font-bold">여행 설문 조사</h1>
-          <p className="text-sm text-muted-foreground">
-            폼 ID <span className="font-mono">{formId}</span> · 나의 역할{" "}
-            <span className="font-medium">{roleLabel(role)}</span>
-          </p>
-          <p className="mt-1 text-xs">
-            <span
-              className={
-                sync.connected
-                  ? "text-green-600"
-                  : "animate-pulse text-amber-600"
-              }
-            >
-              {sync.connected ? "● 실시간 연결됨" : "○ 연결 시도 중…"}
-            </span>
+          {/* 폼 ID는 상대에게 공유·식별하는 키라 작게 유지. "나의 역할"은 아래 presence의 (나) 배지와 중복이라 제거 */}
+          <p className="text-xs text-muted-foreground">
+            폼 ID <span className="font-mono">{formId}</span>
           </p>
         </div>
-        <PresenceBar participants={sync.participants} myClientId={sync.myClientId} />
+        <div className="flex flex-col items-start gap-1 lg:items-end">
+          <PresenceBar participants={sync.participants} myClientId={sync.myClientId} />
+          {/* 정상 연결 표시는 presence가 대신하므로 생략. 비정상(재연결 중)일 때만 노출 */}
+          {!sync.connected && (
+            <span className="animate-pulse text-xs text-amber-600">○ 연결 시도 중…</span>
+          )}
+        </div>
       </header>
 
-      {/* 단계 표시 (Stepper) — 클릭 시 양방향 동기화 이동 */}
-      <Stepper
-        className="mb-6"
-        current={sync.currentPage}
-        steps={PAGE_TITLES.map((label, i) => ({ value: i + 1, label }))}
-        onStepClick={(page) => sync.goToPage(page)}
-      />
+      {/* 단계 표시 (Stepper) — 스크롤해도 상단 고정, 클릭 시 양방향 동기화 이동.
+          음수 마진으로 main 패딩을 덮어 sticky 배경을 가로 전체로 확장한다 */}
+      <div className="sticky top-0 z-20 -mx-4 mb-6 border-b bg-background/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        <Stepper
+          current={sync.currentPage}
+          steps={PAGE_TITLES.map((label, i) => ({ value: i + 1, label }))}
+          onStepClick={(page) => sync.goToPage(page)}
+        />
+      </div>
 
       {/* 현재 페이지 문항 */}
       <div className="space-y-4">
@@ -183,12 +182,35 @@ export default function FormView({ formId, role }: { formId: string; role: Role 
         ))}
       </div>
 
-      {/* 하단 고정 바: 제출 (단계 이동은 상단 Stepper에서 처리) */}
+      {/* 하단 고정 바: 이전/다음(가운데) + 제출(오른쪽). 3열 그리드로 이동 버튼을 정중앙에 고정 */}
       <div className="fixed inset-x-0 bottom-0 border-t bg-background/95 p-4 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-4xl items-center justify-end px-0 sm:px-2 lg:px-4">
-          <Button onClick={handleSubmitClick} disabled={!sync.connected}>
-            {role === "AUTHOR" ? "제출하기" : "작성자에게 제출 요청"}
-          </Button>
+        <div className="mx-auto grid w-full max-w-4xl grid-cols-3 items-center gap-2 px-0 sm:px-2 lg:px-4">
+          <div />
+          <div className="flex items-center justify-center gap-2">
+            <Button
+              variant="secondary"
+              className="font-semibold shadow-sm"
+              disabled={sync.currentPage <= 1}
+              onClick={() => sync.goToPage(sync.currentPage - 1)}
+            >
+              <ChevronLeft className="size-4" />
+              이전
+            </Button>
+            <Button
+              variant="secondary"
+              className="font-semibold shadow-sm"
+              disabled={sync.currentPage >= totalPages}
+              onClick={() => sync.goToPage(sync.currentPage + 1)}
+            >
+              다음
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={handleSubmitClick} disabled={!sync.connected}>
+              {role === "AUTHOR" ? "제출하기" : "작성자에게 제출 요청"}
+            </Button>
+          </div>
         </div>
       </div>
 
