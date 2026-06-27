@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
@@ -15,7 +15,6 @@ import {
 import { useFormSync } from "@/hooks/useFormSync";
 import { QuestionField } from "@/components/QuestionField";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Stepper } from "@/components/ui/stepper";
 import {
   AlertDialog,
@@ -28,7 +27,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-/** 한 역할(작성자/상담사)의 접속자들을 칩으로 나열. 같은 역할 N명을 모두 표시한다. */
+/** 한 역할(작성자/상담사)의 접속자들을 칩으로 나열. 같은 역할 N명을 모두 표시한다.
+ *  인원수 배지는 두지 않는다(소수 인원이라 칩만으로 충분). 미접속이면 흐리게 표시. */
 function PresenceGroup({
   role,
   list,
@@ -38,15 +38,17 @@ function PresenceGroup({
   list: Participant[];
   myClientId: string;
 }) {
+  if (list.length === 0) {
+    return (
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <span className="text-sm font-medium">{roleLabel(role)}</span>
+        <span className="text-xs">미접속</span>
+      </div>
+    );
+  }
   return (
     <div className="flex items-center gap-2">
       <span className="text-sm font-medium">{roleLabel(role)}</span>
-      <Badge
-        variant="outline"
-        className={list.length ? "border-green-500 text-green-600" : "text-muted-foreground"}
-      >
-        {list.length}명
-      </Badge>
       <div className="flex flex-wrap items-center gap-1">
         {list.map((p) => {
           const isMe = p.clientId === myClientId;
@@ -96,18 +98,28 @@ export default function FormView({ formId, role }: { formId: string; role: Role 
     ),
   });
   const sync = useFormSync(formId, role, form);
+  // 직전에 스크롤을 맞춘 페이지. "포커스 없는 단순 단계 이동"에서만 맨 위로 1회 스크롤하기 위한 가드.
+  // (sync 객체는 매 렌더 새로 생성돼 아래 effect가 매 렌더 실행되므로, ref로 중복 스크롤을 막는다)
+  const lastScrolledPage = useRef(0);
 
-  // 페이지 점프 후 DOM 렌더 완료 시점에 스크롤 (명세 §6 타이밍 안전 처리)
+  // 단계 이동 후 스크롤 처리 (명세 §6 타이밍 안전 처리)
+  //  - 포커스 이벤트(pendingFocus)면: 해당 문항으로 스크롤(우선)
+  //  - 일반 단계 이동이면: 이전 페이지 스크롤 위치가 남아 마지막 문항이 보이지 않게 맨 위로 리셋
   useEffect(() => {
-    if (!sync.pendingFocus) return;
-    const el = document.getElementById(sync.pendingFocus);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-      el.classList.add("ring-2", "ring-primary");
-      window.setTimeout(() => el.classList.remove("ring-2", "ring-primary"), 1500);
-      sync.clearPendingFocus();
+    if (sync.pendingFocus) {
+      const el = document.getElementById(sync.pendingFocus);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("ring-2", "ring-primary");
+        window.setTimeout(() => el.classList.remove("ring-2", "ring-primary"), 1500);
+        lastScrolledPage.current = sync.currentPage;
+        sync.clearPendingFocus();
+      }
+      // el 이 아직 없으면(새 페이지 DOM 미렌더) 다음 렌더에서 재시도
+    } else if (lastScrolledPage.current !== sync.currentPage) {
+      lastScrolledPage.current = sync.currentPage;
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
-    // currentPage 가 바뀌어 새 페이지가 렌더된 뒤 재실행되어야 한다
   }, [sync.currentPage, sync.pendingFocus, sync]);
 
   const pageQuestions = questionsOnPage(sync.currentPage);
@@ -140,6 +152,8 @@ export default function FormView({ formId, role }: { formId: string; role: Role 
   }
 
   return (
+    // 전체 폭 배경을 살짝 진하게(muted) 깔아 흰색 문항 카드의 시인성을 높인다
+    <div className="min-h-screen bg-muted/40">
     <main className="mx-auto w-full max-w-4xl px-4 pb-28 pt-4 sm:px-6 sm:pt-6 lg:px-8">
       {/* 헤더: 폼 정보 + presence */}
       <header className="mb-4 flex flex-col gap-3 border-b pb-4 lg:flex-row lg:items-center lg:justify-between">
@@ -231,5 +245,6 @@ export default function FormView({ formId, role }: { formId: string; role: Role 
         </AlertDialogContent>
       </AlertDialog>
     </main>
+    </div>
   );
 }
