@@ -1,0 +1,15 @@
+# OS
+.DS_Store
+
+# 로그/임시
+*.log
+backend.zip
+
+# mise (로컬 도구 캐시)
+.mise/
+
+# 루트 레벨 안전망 (각 하위 프로젝트에도 자체 .gitignore 존재)
+**/node_modules/
+**/.next/
+**/build/
+**/.gradle/
